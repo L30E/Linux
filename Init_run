@@ -7,4 +7,4 @@ echo "Network configuration"
 /sbin/ifconfig
 
 #Installs 
-sudo yum install nano git docker gedit vim gparted filezilla atom firefox iptables ddrescue htop netstat wireshark 
+sudo yum install nano git docker gedit vim gparted filezilla firefox iptables htop net-tools wireshark 
