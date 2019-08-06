@@ -1,0 +1,10 @@
+#! /bin/bash
+
+#Initial CentOS Install Package
+
+echo "Current date : $(date) @ $(hostname)"
+echo "Network configuration"
+/sbin/ifconfig
+
+#Installs 
+sudo yum update && yum upgrade && yum install nano git docker gedit vim gparted filezilla atom firefox iptables ddrescue htop netstat wireshark 
