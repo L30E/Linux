@@ -1,0 +1,154 @@
+\\CentOS Server Hardening
+
+\\Add the following to /etc/security/limits.conf to enforce sensible security limits:
+
+# 4096 is a good starting point
+*      soft   nofile    4096
+*      hard   nofile    65536
+*      soft   nproc     4096
+*      hard   nproc     4096
+*      soft   locks     4096
+*      hard   locks     4096
+*      soft   stack     10240
+*      hard   stack     32768
+*      soft   memlock   64
+*      hard   memlock   64
+*      hard   maxlogins 10
+
+# Soft limit 32GB, hard 64GB
+*      soft   fsize     33554432
+*      hard   fsize     67108864
+
+# Limits for root
+root   soft   nofile    4096
+root   hard   nofile    65536
+root   soft   nproc     4096
+root   hard   nproc     4096
+root   soft   stack     10240
+root   hard   stack     32768
+root   soft   fsize     33554432
+
+\\3. System Settings – Firewall and Network Configuration
+\\3.1 Firewall
+\\Setting the default firewalld zone to drop makes any packets which are not explicitly permitted to be rejected.
+
+# sed -i "s/DefaultZone=.*/DefaultZone=drop/g" /etc/firewalld/firewalld.conf
+
+\\Unless firewalld is required, mask it and replace with iptables:
+
+# systemctl stop firewalld.service
+# systemctl mask firewalld.service
+# systemctl daemon-reload
+# yum install iptables-services
+# systemctl enable iptables.service ip6tables.service
+
+\\Apply configurations:
+
+# iptables-restore < /etc/sysconfig/iptables
+# ip6tables-restore < /etc/sysconfig/ip6tables
+
+\\3.9 Secure VPN Connection
+\\Install the libreswan package if implementation of IPsec and IKE is required.
+
+# yum install libreswan
+
+\\4. System Settings – SELinux
+\\Ensure that SELinux is not disabled in /etc/default/grub, and verify that the state is enforcing:
+
+# sestatus
+
+7. System Settings – Software Integrity Checking
+7.1 Advanced Intrusion Detection Environment (AIDE)
+Install AIDE:
+
+# yum install aide
+Build AIDE database:
+
+# /usr/sbin/aide --init
+By default, the database will be written to the file /var/lib/aide/aide.db.new.gz.
+
+# cp /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+Storing the database and the configuration file /etc/aide.conf (or SHA2 hashes of the files) in a secure location provides additional assurance about their integrity.
+
+Check AIDE database:
+
+# /usr/sbin/aide --check
+By default, AIDE does not install itself for periodic execution. Configure periodic execution of AIDE by adding to cron:
+
+# echo "30 4 * * * root /usr/sbin/aide --check|mail -s 'AIDE' root@example.com" >> /etc/crontab
+Periodically running AIDE is necessary in order to reveal system changes.
+
+10. System Settings – OS Update Installation
+Install the package yum-utils for better consistency checking of the package database.
+
+# yum install yum-utils
+Configure automatic package updates via yum-cron.
+
+# yum install yum-cron
+Add the following to /etc/yum/yum-cron.conf to get notified via email when new updates are available:
+
+update_cmd = default
+update_messages = yes
+download_updates = no	
+apply_updates = no
+emit_via = email	
+email_from = root@example.com
+email_to = user@example.com
+email_host = localhost
+Add the following to /etc/yum/yum-cron-hourly.conf to check for bugfix-related updates every hour and automatically download and install them:
+
+update_cmd = minimal # yum --bugfix update-minimal
+update_messages = yes
+download_updates = yes
+apply_updates = yes
+emit_via = stdio
+Note: security information is provided by RedHat only. When you query a repository that is provided by CentOS it does not supply security metadata (however the EPEL repository does have security metadata).
+
+Therefore if you decide to use update_cmd = security, yum will always tell you that nothing from CentOS needs a security update.
+
+Enable and start the service:
+
+# systemctl enable yum-cron.service
+# systemctl start yum-cron.service
+
+3. Services – Mail Server
+3.1 Postfix
+Postfix should be installed and enabled already. In case it isn’t, the do the following:
+
+# yum install postfix
+# systemctl enable postfix.service
+Open /etc/postfix/main.cf and configure the following to act as a null client:
+
+smtpd_banner = $myhostname ESMTP
+inet_interfaces = loopback-only
+inet_protocols = ipv4
+mydestination =
+local_transport = error: local delivery disabled
+unknown_local_recipient_reject_code = 550
+mynetworks = 127.0.0.0/8
+relayhost = [mail.example.com]:587
+Optionally (depending on your setup), you can configure Postfix to use authentication:
+
+# yum install cyrus-sasl-plain
+Open /etc/postfix/main.cf and add the following:
+
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_tls_CApath = /etc/ssl/certs
+smtp_use_tls = yes
+Open /etc/postfix/sasl_passwd and put authentication credentials in a format of:
+
+[mail.example.com]:587 user@example.com:password
+Set permissions and create a database file:
+
+# chmod 0600 /etc/postfix/sasl_passwd
+# postmap /etc/postfix/sasl_passwd
+Restart the service and ensure that firewall allows outgoing traffic to the SMTP relay server.
+
+8. Services – Sysstat to Collect Performance Activity
+Sysstat may provide useful insight into system usage and performance, however, unless used, the service should be disabled, or not installed at all.
+
+# yum install sysstat
+# systemctl enable sysstat.service
+# systemctl start sysstat.service
